@@ -3,6 +3,7 @@ use std::path::Path;
 mod QuadTree;
 use image::ImageReader;
 mod image_chunking;
+mod poly_regression;
 
 fn qt_builder(x: usize, y: usize) -> usize {
     return x + y;

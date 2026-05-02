@@ -19,6 +19,15 @@ impl<T> Quad<T> {
     fn new() -> Self {
         Quad{nodes: Box::new([Node::Empty, Node::Empty, Node::Empty, Node::Empty])}
     }
+    fn is_terminal(&self) -> bool {
+        for node in self.nodes.iter() {
+            match node {
+                Node::Terminal(_) | Node::Empty => continue,
+                _ => return false,
+            }
+        }
+        return true;
+    }
 }
 
 enum Node<T> {
@@ -101,10 +110,19 @@ pub struct QuadTree<T> {
     node: Node<T>
 }
 
-pub struct QuadTreeIter<'a, T> {
+
+// Iterator struct for all terminal nodes in the quad tree
+pub struct QuadTreeTerminalIter<'a, T> {
     qt_stack: Vec::<(&'a Quad<T>, usize)>,
     cur: Option<&'a Node<T>>,
 }
+
+pub struct QuadTreeDepthIter<'a, T> {
+    qt_stack: Vec::<(&'a Quad<T>, usize)>,
+    cur: Option<&'a Quad<T>>,
+    depth: usize,
+}
+
 
 impl<T> QuadTree<T> {
 
@@ -121,14 +139,28 @@ impl<T> QuadTree<T> {
         return QuadTree{ node: Node::new_from_depth_ranged(depth as usize, (xWidth, yWidth), init, (0, 0)) };
     }
 
-    pub fn iter<'a>(&'a self) -> QuadTreeIter<'a, T> {
-        return QuadTreeIter::new(self);
-    } 
+    pub fn iter<'a>(&'a self) -> QuadTreeTerminalIter<'a, T> {
+        return QuadTreeTerminalIter::new(self);
+    }
+
+    pub fn iter_depth<'a>(&'a self, depth: usize) -> QuadTreeDepthIter<'a, T> {
+        return QuadTreeDepthIter::new(self, depth);
+    }
+
+
 }
 
-impl<'a, T> QuadTreeIter<'a, T> {
+// // Function called on quads guaranteed to be consisting of terminals
+// fn collapser<T>(node: Quad<T>) -> Node<T> {
+//     if (_) {
+//         return Node::Terminal(todo!());
+//     }
+//     return Node::Quad(node);
+// }
+
+impl<'a, T> QuadTreeTerminalIter<'a, T> {
     fn new(qt: &'a QuadTree<T>) -> Self {
-        QuadTreeIter {
+        QuadTreeTerminalIter {
             qt_stack: Vec::new(),
             cur: Some(&qt.node),
         }
@@ -136,7 +168,7 @@ impl<'a, T> QuadTreeIter<'a, T> {
     }
 }
 
-impl<T: Copy> Iterator for QuadTreeIter<'_, T> {
+impl<T: Copy> Iterator for QuadTreeTerminalIter<'_, T> {
     // We can refer to this type using Self::Item
     type Item = T;
 
@@ -187,6 +219,105 @@ impl<T: Copy> Iterator for QuadTreeIter<'_, T> {
                 }
                 self.qt_stack.push((poped_node, poped_idx+1));
                 self.next() // Skep empty by recalling next
+            }
+        }
+    }
+}
+
+impl<'a, T> QuadTreeDepthIter<'a, T> {
+    fn new(qt: &'a QuadTree<T>, depth: usize) -> Self {
+        if let Node::Quad(quad) = &qt.node {
+            QuadTreeDepthIter {
+                qt_stack: Vec::new(),
+                cur: Some(quad),
+                depth: depth,
+            }
+        } else {
+            QuadTreeDepthIter {
+                qt_stack: Vec::new(),
+                cur: None,
+                depth: depth,
+            }
+        }   
+    }
+
+    // Ascend to the nearest quad with unexplored quad child.
+    // self.cur is set to the found child, if none found, set to None
+    fn ascend_nearest(&mut self) {
+        let mut poped_idx;
+        let mut poped_node: &Quad<T>;
+        // Ascend finding next quad child to explore
+        // If poped_idx == 4, then there is no child left to explore on this node, keep going up the stack
+        // If poped_idx != 4, then check if the next child is a quad, 
+        // if so set it as cur and return, else keep going up the stack
+        loop {
+
+            // Pop last node and idx from stack,
+            // if stack is empty the we ascended to the top of the tree
+            // And no quads are left to explore, set cur to None and return
+            (poped_node, poped_idx) = match self.qt_stack.pop() {
+                Some(poped) => poped,
+                None => {
+                    self.cur = None; // if reached end of stack, then iteration finished after current
+                    return; 
+                },
+            };
+            // If not all children explored on this quad, check rest of children for quad
+            if poped_idx != 4 {
+                // Find if the next child is a quad, if so set it as cur and return, else keep going up the stack
+                let mut idx: usize = poped_idx;
+                for child in poped_node.nodes[idx..].iter() {
+                    if let Node::Quad(new_quad) = child {
+                        // If quad child is found repush poped quad to stack with updated idx, update cur, and return
+                        self.qt_stack.push((poped_node, idx+1));
+                        self.cur = Some(new_quad);
+                        return;
+                    }
+                    idx += 1;
+                }
+            }
+        }
+    }
+}
+
+impl<'a, T: Copy> Iterator for QuadTreeDepthIter<'a, T> {
+    // We can refer to this type using Self::Item
+    type Item = &'a Quad<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        match self.cur {
+            None => {
+                return None;
+            }
+            Some(quad) => { 
+                // If at depth return the quad (depth == 0)
+                // else if depth != 0, descend step, and recursively call next
+                if self.depth != 0 {
+                    
+                    // Find the first child in the current quad that is itself a quad.
+                    let mut idx: usize = 0;
+                    for child in quad.nodes[idx..].iter() {
+                        if let Node::Quad(new_quad) = child {
+                            // If quad child is found push last quad to stack with explored idx,
+                            // update cur to the new found quad, and recall next to keep descending until depth is reached
+                            self.qt_stack.push((quad, idx+1));
+                            self.cur = Some(&new_quad);
+                            return self.next();
+                        }
+                        idx += 1;
+                    }
+
+                    // If no quad child is found, then this node is terminal
+                    // ascend back to unexplored quad and recall next()
+                    self.ascend_nearest();
+                    return self.next();
+                } else {
+                    // If at depth return the current quad, and reascend for next call
+                    let ret_quad = quad;
+                    self.ascend_nearest();
+                    return Some(&ret_quad);
+                }
             }
         }
     }

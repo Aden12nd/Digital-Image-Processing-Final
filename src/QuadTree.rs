@@ -19,7 +19,7 @@ impl<T> Quad<T> {
     fn new() -> Self {
         Quad{nodes: Box::new([Node::Empty, Node::Empty, Node::Empty, Node::Empty])}
     }
-    fn is_terminal(&self) -> bool {
+    pub fn is_terminal(&self) -> bool {
         for node in self.nodes.iter() {
             match node {
                 Node::Terminal(_) | Node::Empty => continue,
@@ -27,6 +27,22 @@ impl<T> Quad<T> {
             }
         }
         return true;
+    }
+
+    pub fn depth(&self) -> usize {
+        let mut max_child_depth = 0;
+        for node in self.nodes.iter() {
+            match node {
+                Node::Quad(quad) => {
+                    let child_depth = quad.depth();
+                    if child_depth > max_child_depth {
+                        max_child_depth = child_depth;
+                    }
+                },
+                _ => continue,
+            }
+        }
+        return max_child_depth + 1;
     }
 }
 
@@ -61,7 +77,7 @@ impl<T> Node<T> {
         // If the child is fully in the range, call new_from_depth and stop using the range for that path
         // if the child is partially in the range, recusively call this function, adapting the range and offset as needed
         // If the child is fully out of the range, set it to empty
-        let mut quad: [Node<T>; 4] = [
+        let quad: [Node<T>; 4] = [
             // Top left quadrant
             if range.0 >= child_width && range.1 >= child_width { // If quad is fully in the specified range
                 Self::new_from_depth(depth-1, init, offset) // if able to build quad without range, fillout out to depth-1
@@ -89,7 +105,7 @@ impl<T> Node<T> {
                 )
             },
             // Bottom Right Quadrant
-            if range.0 <= child_width && range.1 <= child_width {
+            if range.0 <= child_width || range.1 <= child_width {
                 Node::Empty // If quad is fully out of range 
             } else {
                 Self::new_from_depth_ranged(depth-1,
@@ -182,7 +198,7 @@ impl<T: Copy> Iterator for QuadTreeTerminalIter<'_, T> {
             Some(Node::Quad(quad)) => { 
                 // If its a quad assume we haven't explored it yet, descent untill terminal
                 let new_cur = &quad.nodes[0];
-                self.qt_stack.push((quad, 0));
+                self.qt_stack.push((quad, 1)); // push quad with next idx to explore
                 self.cur = Some(new_cur);
                 self.next()
             }
@@ -200,6 +216,7 @@ impl<T: Copy> Iterator for QuadTreeTerminalIter<'_, T> {
                     };
                     if poped_idx != 4 {break;}
                 }
+                self.cur = Some(&poped_node.nodes[poped_idx]);
                 self.qt_stack.push((poped_node, poped_idx+1));
                 Some(*ret)
             }
@@ -217,6 +234,7 @@ impl<T: Copy> Iterator for QuadTreeTerminalIter<'_, T> {
                     };
                     if poped_idx != 4 {break;}
                 }
+                self.cur = Some(&poped_node.nodes[poped_idx]);
                 self.qt_stack.push((poped_node, poped_idx+1));
                 self.next() // Skep empty by recalling next
             }
@@ -262,6 +280,8 @@ impl<'a, T> QuadTreeDepthIter<'a, T> {
                     return; 
                 },
             };
+            self.depth += 1;
+
             // If not all children explored on this quad, check rest of children for quad
             if poped_idx != 4 {
                 // Find if the next child is a quad, if so set it as cur and return, else keep going up the stack
@@ -270,6 +290,7 @@ impl<'a, T> QuadTreeDepthIter<'a, T> {
                     if let Node::Quad(new_quad) = child {
                         // If quad child is found repush poped quad to stack with updated idx, update cur, and return
                         self.qt_stack.push((poped_node, idx+1));
+                        self.depth -= 1;
                         self.cur = Some(new_quad);
                         return;
                     }
@@ -302,6 +323,7 @@ impl<'a, T: Copy> Iterator for QuadTreeDepthIter<'a, T> {
                             // If quad child is found push last quad to stack with explored idx,
                             // update cur to the new found quad, and recall next to keep descending until depth is reached
                             self.qt_stack.push((quad, idx+1));
+                            self.depth -= 1;
                             self.cur = Some(&new_quad);
                             return self.next();
                         }

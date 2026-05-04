@@ -1,17 +1,21 @@
 use std::path::Path;
-
+use nalgebra::{self as na, DMatrix, U2, DVector, dmatrix};
+use std::vec::Vec;
 mod QuadTree;
 use image::ImageReader;
 mod image_chunking;
 mod poly_regression;
+mod imagematrix;
 
 fn qt_builder(x: usize, y: usize) -> usize {
     return x + y;
 }
 
 fn main() {
+    let test = dmatrix![1 as f64,1 as f64,1 as f64,1 as f64];
+    let testMat : DMatrix<f64> = imagematrix::matrixOp(imagematrix::create_matrix(2,2));
     println!("Hello, world!");
-
+    imagematrix::matVecMult(testMat, test);
         let img = match ImageReader::open("images/image.png") {
         Ok(i) => match i.decode() {
                 Ok(decoded) => decoded,
@@ -38,7 +42,7 @@ fn main() {
         }
     }
     
-    match img2.save("images/image-out.png") {
+    match img2.save("images/image-out1.png") {
         Ok(_) => {},
         Err(_) => {
             println!("Failed to save image\n");
@@ -50,5 +54,5 @@ fn main() {
     for i in quad_tree.iter() {
         
     }
-}
+} 
 

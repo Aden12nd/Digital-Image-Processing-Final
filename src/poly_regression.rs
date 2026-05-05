@@ -1,8 +1,5 @@
 use crate::cut::Cut;
 
-
-
-
 pub struct PolyFunction2D {
     degree: usize,
     coeffs: Vec<f64>
@@ -45,7 +42,7 @@ enum Regression {
     Split(Cut, PolyFunction2D, PolyFunction2D),
 }
 
-struct ChunkRegression {
+pub struct ChunkRegression {
     function: Regression,
     cost: usize,
 }

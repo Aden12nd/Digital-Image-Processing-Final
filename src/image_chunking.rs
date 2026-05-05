@@ -35,7 +35,7 @@ impl<'a> Chunk<'a> {
 }
 
 // Using some pixel data (obtained probably through Chunk.pixels), get a tuple containing 3 vecs. One for each color channel.
-fn pix_to_channels(pixel_data: Vec<Rgba<u8>>, ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+pub fn pix_to_channels(pixel_data: Vec<Rgba<u8>>, ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let mut out_r: Vec<f64> = Vec::with_capacity(0);
     let mut out_g: Vec<f64> = Vec::with_capacity(0);
     let mut out_b: Vec<f64> = Vec::with_capacity(0);

@@ -1,6 +1,6 @@
 use nalgebra::{self as na, DMatrix, U2, DVector};
 
-use crate::poly_regression::PolyFunction2D;
+use crate::{image_chunking::{Chunk, pix_to_channels}, poly_regression::{ChunkRegression, PolyFunction2D}};
 
 
 struct ChunkPosIter {
@@ -50,5 +50,21 @@ pub fn applyRegression(regres_mat: DMatrix<f64>, pixels: &Vec<f64>) -> DVector<f
     println!("{}, {}", shape.0, shape.1);
 
     return coeffs;
+
+}
+
+pub fn applyRegressionToChunk(regres_mat: DMatrix<f64>, chunk: Chunk) -> (DVector<f64>, DVector<f64>, DVector<f64>) {
+
+    let (r, g, b) = pix_to_channels(chunk.pixels());
+    let red_coeffs = regres_mat.clone()*DVector::from_row_slice(&r);
+    let blue_coeffs = regres_mat.clone()*DVector::from_row_slice(&g);
+    let green_coeffs = regres_mat*DVector::from_row_slice(&b);
+
+    // The actual arguments need to figured out
+    let red_poly = PolyFunction2D::from(0, vec![]);
+    let blue_poly = PolyFunction2D::from(0, vec![]);
+    let green_poly = PolyFunction2D::from(0, vec![]);
+
+    return (red_coeffs, blue_coeffs, green_coeffs);
 
 }

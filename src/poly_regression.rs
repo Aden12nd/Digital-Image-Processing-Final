@@ -1,3 +1,5 @@
+use crate::cut::Cut;
+
 
 
 
@@ -36,3 +38,18 @@ impl PolyFunction2D {
     }
 
 }
+
+
+enum Regression {
+    Global(PolyFunction2D),
+    Split(Cut, PolyFunction2D, PolyFunction2D),
+}
+
+struct ChunkRegression {
+    function: Regression,
+    cost: usize,
+}
+
+// impl ChunkRegression {
+//     pub fn new_global(coeffs: Vec<f64>, )
+// }

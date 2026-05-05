@@ -46,7 +46,7 @@ impl<'a> Chunk<'a> {
     }
 
     pub fn load_regression(&mut self, r: ChunkRegression, g: ChunkRegression, b: ChunkRegression) {
-        if self.regression_red.cost + self.regression_green.cost + self.regression_blue.cost < r.cost + g.cost + b.cost {
+        if r.cost + g.cost + b.cost < self.regression_red.cost + self.regression_green.cost + self.regression_blue.cost {
             self.regression_red = r;
             self.regression_green = g;
             self.regression_blue = b;

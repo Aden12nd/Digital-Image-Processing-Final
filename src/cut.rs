@@ -85,7 +85,7 @@ fn belongs_to_first(row: usize, col: usize, size: usize, cut: &Cut) -> bool {
     }
 }
 
-pub fn cutSegment(pixel_data: Vec<f64>, size: usize, cut: Cut) -> (Vec<f64>, Vec<f64>) {
+pub fn cut_segment<T: Copy>(pixel_data: Vec<T>, size: usize, cut: Cut) -> (Vec<T>, Vec<T>) {
     assert_eq!(pixel_data.len(), size * size);
 
     let mut a = Vec::with_capacity(pixel_data.len());

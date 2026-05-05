@@ -67,7 +67,6 @@ fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>,
 }
 
 pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: &mut Chunk, chunk_cut: Option<Cut>) {
-
     if let Some(_) = chunk_cut {
         unimplemented!()
     } else {

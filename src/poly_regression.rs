@@ -62,4 +62,8 @@ impl ChunkRegression {
             cost: MSE + (2*degree) as f64 + 1.0
         }
     }
+
+    pub fn new_split(degree: usize, coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, size: usize, MSE: f64) -> Self {
+        // MSE + 4*degree + 2.0 + ((Size*size) as f64).ln()
+    }
 }

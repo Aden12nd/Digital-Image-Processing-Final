@@ -1,29 +1,37 @@
 use std::cmp::max;
 
+use nalgebra::DMatrix;
+
+use crate::{image_chunking, regression_apply};
+
+use nalgebra::{self as na, U2, DVector, dmatrix};
 
 
 
-
+#[derive(Clone)]
 pub struct Quad {
     nodes: [usize; 4] 
 }
 
-enum Node<T> {
+#[derive(Clone)]
+pub enum Node<T: Clone> {
     Quad(Quad),
     Terminal(T),
     Empty,
 }
 
-struct NodeRegestry<T> {
+struct NodeRegestry<T: Clone> {
     nodes: Vec<Node<T>>
 }
 
-pub struct QuadTree<T> {
+pub struct QuadTree<T: Clone> {
     node: usize,
     regestry: NodeRegestry<T>,
 }
 
-impl<T> NodeRegestry<T> {
+
+
+impl<T: Clone> NodeRegestry<T> {
 
     fn new() -> Self {
         NodeRegestry { nodes: Vec::new() }
@@ -76,17 +84,24 @@ impl Quad {
     fn new(nodeIDs: [usize; 4]) -> Self {
         Quad{nodes: nodeIDs}
     }
-    pub fn is_terminal<T>(&self, regestry: &NodeRegestry<T>) -> bool {
-        for id in self.nodes.iter() {
-            match regestry.nodes[*id] {
+    fn is_terminal<T: Clone>(&self, regestry: &NodeRegestry<T>) -> bool {
+        for id in self.nodes {
+            match &regestry.nodes[id] {
                 Node::Terminal(_) | Node::Empty => continue,
-                _ => return false,
+                Node::Quad(quad) => {
+                    println!("Looking for terminal, found quad {}", quad.depth(regestry));
+                    return false;
+                },
+                Node::Empty => {
+                    println!("Looking for terminal, found Empty");
+
+                }
             }
         }
         return true;
     }
 
-    pub fn depth<T>(&self, regestry: &NodeRegestry<T>) -> usize {
+    pub fn depth<T: Clone>(&self, regestry: &NodeRegestry<T>) -> usize {
         let mut max_child_depth = 0;
         for id in self.nodes.iter() {
             match &regestry.nodes[*id] {
@@ -101,30 +116,47 @@ impl Quad {
         }
         return max_child_depth + 1;
     }
+
+    pub fn min_depth<T: Clone> (&self, regestry: &NodeRegestry<T>) -> usize {
+        let mut min_child_depth = 1000000000000;
+        for id in self.nodes {
+            match &regestry.nodes[id] {
+                Node::Quad(quad) => {
+                    let child_depth = quad.min_depth(regestry);
+                    if child_depth < min_child_depth {
+                        min_child_depth = child_depth;
+                    }
+                },
+                _ => continue,
+            }
+        }
+        return min_child_depth + 1;
+    }
 }
 
 
 
-impl<T> Node<T> {
-    fn new_from_depth(depth: usize, init: fn(usize, usize) -> T, offset: (usize, usize), regestry: &mut NodeRegestry<T>) -> usize {
+impl<T: Clone> Node<T> {
+    fn new_from_depth(depth: usize, init: &dyn Fn((usize, usize)) -> T, offset: (usize, usize), regestry: &mut NodeRegestry<T>) -> usize {
         if depth == 0 {
-            return regestry.regesterNode(Node::Terminal(init(offset.0, offset.1)));
+            return regestry.regesterNode(Node::Terminal(init((offset.0, offset.1))));
         }
         let child_width = 1<<(depth-1);
-        let node_id = regestry.create_node();
-        let children = [
-                Self::new_from_depth(depth-1, init, offset, regestry),
-                Self::new_from_depth(depth-1, init, (offset.0 + child_width, offset.1), regestry),
-                Self::new_from_depth(depth-1, init, (offset.0 , offset.1 + child_width), regestry),
-                Self::new_from_depth(depth-1, init, (offset.0 + child_width, offset.1 + child_width ), regestry),
-        ];
-        regestry.set_node(node_id, Node::Quad(Quad::new(children)));
+        // let node_id = regestry.create_node();
+        let nodeA = Self::new_from_depth(depth-1, init, offset, regestry);
+        let nodeB = Self::new_from_depth(depth-1, init, (offset.0 + child_width, offset.1), regestry);
+        let nodeC = Self::new_from_depth(depth-1, init, (offset.0 , offset.1 + child_width), regestry);
+        let nodeD = Self::new_from_depth(depth-1, init, (offset.0 + child_width, offset.1 + child_width ), regestry);
+        let node_id = regestry.create_quad([
+            nodeA, nodeB, nodeC, nodeD
+        ]);
+        // regestry.set_node(node_id, Node::Quad(Quad::new(children)));
         node_id
     }
 
-    fn new_from_depth_ranged(depth: usize, range: (usize, usize), init: fn(usize, usize) -> T, offset: (usize, usize), regestry: &mut NodeRegestry<T>) -> usize {
+    fn new_from_depth_ranged(depth: usize, range: (usize, usize), init: &dyn Fn((usize, usize)) -> T, offset: (usize, usize), regestry: &mut NodeRegestry<T>) -> usize {
         if depth == 0 {
-            return regestry.regesterNode(Node::Terminal(init(offset.0, offset.1)));
+            return regestry.regesterNode(Node::Terminal(init((offset.0, offset.1))));
         }
         let child_width = 1<<(depth-1);
         // Build 4 child nodes
@@ -196,14 +228,14 @@ impl<T> Node<T> {
 // }
 
 
-impl<T> QuadTree<T> {
+impl<T: Clone> QuadTree<T> {
 
     pub fn new() -> Self {
         let mut reg = NodeRegestry::<T>::new();
         QuadTree{node: reg.regesterNode(Node::Empty), regestry: reg}
     }
 
-    pub fn new_grid(xWidth: usize, yWidth: usize, init: fn(usize, usize) -> T) -> Self {
+    pub fn new_grid(xWidth: usize, yWidth: usize, init: &dyn Fn((usize, usize)) -> T) -> Self {
         if xWidth == 0 || yWidth == 0 {
             return Self::new();
         }
@@ -224,6 +256,67 @@ impl<T> QuadTree<T> {
     //     return QuadTreeDepthIter::new(self, depth);
     // }
 
+    
+    // pub fn collapse(&mut self, depth: usize, collapser: fn([&Node<T>;4]) -> Option<Node<T>>) {
+    //     let mut stack: Vec<(usize, usize)> = Vec::new();
+    //     let mut cur = self.node;
+    //     loop  {
+    //         let res = self.descend(cur, &mut stack, depth);
+            
+    //         // Check if descent found a node, is a quad, and is terminal
+    //         // If so call collapser, if Some(Node) recieved, overright node
+    //         if let Some(next_node) = res {
+    //             let node = self.regestry.get(next_node);
+    //             if let Node::Quad(quad) = node {
+    //                 let is_term = quad.is_terminal(&self.regestry);
+    //                 if !is_term {
+    //                     let collapse_res = collapser([
+    //                         self.regestry.get(quad.nodes[0]),
+    //                         self.regestry.get(quad.nodes[1]),
+    //                         self.regestry.get(quad.nodes[2]),
+    //                         self.regestry.get(quad.nodes[3]),
+    //                     ]);
+    //                     if let Some(collapse_node) = collapse_res {
+    //                         self.regestry.set_node(next_node, collapse_node);
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //         if let Some(ascend_res) = self.ascend(&mut stack) {
+    //             cur = ascend_res;
+    //         } else {
+    //             break;
+    //         }
+
+
+    //     }
+
+
+    // }
+
+    pub fn depth(&self) -> usize {
+        if let Node::Quad(quad) = self.regestry.get(self.node) {
+            quad.depth(&self.regestry)
+        } else {
+            0
+        }
+    }
+
+    pub fn min_depth(&self) -> usize {
+        if let Node::Quad(quad) = self.regestry.get(self.node) {
+            quad.min_depth(&self.regestry)
+        } else {
+            0
+        }
+    }
+
+
+
+}
+
+
+impl<'c> QuadTree<image_chunking::Chunk<'c>> {
     fn descend(&mut self, cur: usize, stack: &mut Vec<(usize, usize)>, depth: usize) -> Option<usize> {
         if stack.len() == depth {
             return Some(cur);
@@ -255,7 +348,46 @@ impl<T> QuadTree<T> {
 
     }
 
-    pub fn collapse_depth(&mut self, depth: usize, collapser: fn([&Node<T>;4]) -> Option<Node<T>>) {
+    fn collapse<'b, 'a>(children: [&Node<image_chunking::Chunk<'a>>; 4], reg_mat: &DMatrix<f64>, order_mat:&DMatrix<f64>) -> Option<Node<image_chunking::Chunk<'a>>> {
+        println!("Collapsing children");
+        let mut chunks: [&image_chunking::Chunk; 4] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+        let mut children_cost_r = 0.0;
+        let mut children_cost_g = 0.0;
+        let mut children_cost_b = 0.0;
+        for (i, child) in children.iter().enumerate() {
+            if let Node::<image_chunking::Chunk>::Terminal(child_chunk) = *child {
+                children_cost_r += child_chunk.regression_red.cost;
+                children_cost_g += child_chunk.regression_green.cost;
+                children_cost_b += child_chunk.regression_blue.cost;
+                chunks[i] = child_chunk;
+            } else {
+                println!("Non-Terminal found, not reducing");
+                return None;
+            }
+        }
+
+        // let mut new_chunk = image_chunking::Chunk::new_combine(&chunks);
+        let mut new_chunk = image_chunking::Chunk::new(chunks[0].image, chunks[0].coordinate, chunks[0].size *2);
+
+        regression_apply::applyRegressionToChunk(reg_mat, order_mat, 1, &mut new_chunk, None);
+
+        println!("children cost: {} {} {}", children_cost_r, children_cost_g, children_cost_b);
+        println!("parent cost: {} {} {}", new_chunk.regression_red.cost, new_chunk.regression_red.cost, new_chunk.regression_red.cost);
+
+        if new_chunk.regression_red.cost + new_chunk.regression_red.cost + new_chunk.regression_red.cost
+            < children_cost_r + children_cost_g + children_cost_b {
+            
+            println!("Collapsing children\n");
+            return Some(Node::Terminal(new_chunk));
+        } else {
+            println!("Not collapsing children\n");
+            None
+        }
+        
+    }
+
+    // init: &dyn Fn((usize, usize)) -> T
+    pub fn collapse_depth<'a: 'c>(& mut self, depth: usize, reg_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>) {
         let mut stack: Vec<(usize, usize)> = Vec::new();
         let mut cur = self.node;
         loop  {
@@ -264,20 +396,38 @@ impl<T> QuadTree<T> {
             // Check if descent found a node, is a quad, and is terminal
             // If so call collapser, if Some(Node) recieved, overright node
             if let Some(next_node) = res {
+                println!("Descent found a node {} {}", next_node, stack.len());
                 let node = self.regestry.get(next_node);
                 if let Node::Quad(quad) = node {
                     let is_term = quad.is_terminal(&self.regestry);
-                    if !is_term {
-                        let collapse_res = collapser([
-                            self.regestry.get(quad.nodes[0]),
-                            self.regestry.get(quad.nodes[1]),
-                            self.regestry.get(quad.nodes[2]),
-                            self.regestry.get(quad.nodes[3]),
-                        ]);
+
+                    if is_term {
+                        println!("It's terminal");
+
+                        let node1 = self.regestry.get(quad.nodes[0]);
+                        let node2 =self.regestry.get(quad.nodes[1]);
+                        let node3 =self.regestry.get(quad.nodes[2]);
+                        let node4 =self.regestry.get(quad.nodes[3]);
+                        let collapse_res = QuadTree::collapse([
+                            node1,
+                            node2,
+                            node3,
+                            node4
+                        ],
+                            reg_mat,
+                            order_mat,
+                        );
                         if let Some(collapse_node) = collapse_res {
-                            self.regestry.set_node(next_node, collapse_node);
+                            self.regestry.set_node(next_node, collapse_node.clone());
                         }
                     }
+                } else {
+                    match node {
+                        Node::Quad(quad) => println!("Quad"),
+                        Node::Terminal(_) => println!("terminal"),
+                        Node::Empty => println!("Empty"),
+                    }
+                    println!("Found non quad");
                 }
             }
 
@@ -292,8 +442,6 @@ impl<T> QuadTree<T> {
 
 
     }
-
-
 
 }
 

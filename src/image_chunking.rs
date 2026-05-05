@@ -2,16 +2,52 @@ use image::{DynamicImage, GenericImage, GenericImageView, Pixel, Rgba, SubImage}
 
 use crate::poly_regression::ChunkRegression;
 
+#[derive(Clone)]
 pub struct Chunk<'a> {
     pub image: &'a DynamicImage,
-    regression_red: ChunkRegression,
-    regression_green: ChunkRegression,
-    regression_blue: ChunkRegression,
+    pub regression_red: ChunkRegression,
+    pub regression_green: ChunkRegression,
+    pub regression_blue: ChunkRegression,
     pub coordinate: (u32, u32),
     pub size: u32
 }
 
+
 impl<'a> Chunk<'a> {
+
+    pub fn new_combine(chunks: &[&'a Chunk; 4]) -> Self {
+        // Combine as:
+        //  +----------> +x
+        //  | +---+---+
+        //  | | 0 | 1 |
+        //  | +---+---+
+        //  | | 2 | 3 |
+        //  | +---+---+
+        //  V
+        // +y
+        
+        // check that sections allign
+        if chunks[0].coordinate.0 + chunks[0].size != chunks[1].coordinate.0 {
+            panic!("In combining chunks, chunk 0 and 1 don't boarder");
+        } else if chunks[2].coordinate.0 + chunks[2].size != chunks[3].coordinate.0 {
+            panic!("In combining chunks, chunk 2 and 3 don't boarder");
+        } else if chunks[0].coordinate.1 + chunks[0].size != chunks[2].coordinate.1 {
+            panic!("In combining chunks, chunk 0 and 2 don't boarder");
+        } else if chunks[1].coordinate.1 + chunks[1].size != chunks[3].coordinate.1 {
+            panic!("In combining chunks, chunk 0 and 1 don't boarder");
+        }
+
+        Chunk {
+            image: chunks[0].image,
+            regression_red: ChunkRegression::new_empty(), 
+            regression_green: ChunkRegression::new_empty(), 
+            regression_blue: ChunkRegression::new_empty(), 
+            coordinate: chunks[0].coordinate,
+            size: chunks[0].size*2
+        }
+
+    }
+
     pub fn new(image: &'a DynamicImage, coordinate: (u32, u32), size : u32) -> Self {
         Self { 
             image, 

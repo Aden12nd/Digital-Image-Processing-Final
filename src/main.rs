@@ -11,21 +11,95 @@ mod imagematrix;
 mod regression_apply;
 mod cut;
 
-fn qt_builder<'a>(img: &'a DynamicImage) -> Box<dyn Fn((usize, usize)) -> image_chunking::Chunk<'a> + 'a> {
-    Box::new(move |pos| image_chunking::Chunk::new(img, (pos.0 as u32, pos.1 as u32), 1))
+
+fn qt_builder<'b, 'a: 'b>(img: &'a DynamicImage) -> Box<dyn Fn((usize, usize)) -> image_chunking::Chunk<'a> + 'b> {
+    Box::new(|pos| image_chunking::Chunk::<'a>::new(img, (pos.0 as u32, pos.1 as u32), 1))
 }
 
 fn qt_test_builder(x: usize, y: usize) -> (usize, usize) {
     (x,y)
 } 
 
+// fn([&Node<T>;4]) -> Option<Node<T>>
+
+
+
+// fn collapse<'a>(children: [&'a QuadTree::Node<image_chunking::Chunk<'a>>;4], reg_mat: &'a DMatrix<f64>) -> Option<QuadTree::Node<image_chunking::Chunk<'a>>> {
+    
+//     let mut chunks: [&'a image_chunking::Chunk<'a>; 4] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+//     let mut children_cost_r = 0.0;
+//     let mut children_cost_g = 0.0;
+//     let mut children_cost_b = 0.0;
+//     for (i, child) in children.iter().enumerate() {
+//         if let QuadTree::Node::Terminal(child_chunk) = *child {
+//             children_cost_r += child_chunk.regression_red.cost;
+//             children_cost_g += child_chunk.regression_green.cost;
+//             children_cost_b += child_chunk.regression_blue.cost;
+//             chunks[i] = child_chunk;
+//         } else {
+//             return None;
+//         }
+//     }
+//     let mut new_chunk = image_chunking::Chunk::new_combine(chunks);
+
+//     if new_chunk.regression_red.cost + new_chunk.regression_red.cost + new_chunk.regression_red.cost
+//         < children_cost_r + children_cost_g + children_cost_b {
+
+//         return Some(QuadTree::Node::Terminal(new_chunk));
+//     } else {
+//         None
+//     }
+    
+// }
+
+// fn make_collapser<'c, 'b: 'c, 'a: 'b+'c>(reg_mat: DMatrix<f64>) -> Box<dyn Fn(&[&'a QuadTree::Node<image_chunking::Chunk<'a>>;4]) -> Option<QuadTree::Node<image_chunking::Chunk<'a>>> + 'static> {
+//     Box::new(|children: &[&'a QuadTree::Node<image_chunking::Chunk<'_>>; 4]| 
+// }
+
+// pub fn make_collapser<'a>(reg_mat: &'a DMatrix<f64>) -> Box<dyn Fn([&QuadTree::Node<image_chunking::Chunk>;4]) -> Option<QuadTree::Node<image_chunking::Chunk<'a>>> + 'a> {
+//     Box::new(move |nodes: [&'a QuadTree::Node<image_chunking::Chunk<'a>>; 4]| collapse(nodes, reg_mat))
+// }
+
 fn main() {
 
-    // let img: ImageReader<std::io::BufReader<std::fs::File>> = ImageReader::open("images/image.png").unwrap();
+    let img: DynamicImage = match ImageReader::open("images/image.png").unwrap().decode() {
+        Ok(decoded) => decoded,
+        Err(_) => panic!("Encountered error in decoding image"),
+    };
 
-    // let builder = qt_builder(img);
+    let width = img.width();
+    let height = img.height();
 
-    // let mut qt: QuadTree::QuadTree<image_chunking::Chunk> = QuadTree::QuadTree::newGrid(xWidth, yWidth, init)
+    let builder = qt_builder(&img);
+
+    let mut qt = QuadTree::QuadTree::new_grid(width as usize, height as usize, &builder);
+    let depth = qt.depth();
+
+    println!("Min depth is {}", qt.min_depth());
+
+    // let collapser = make_collapser(reg_mat);
+    println!("Starting collapsing {}", depth);
+    for di in 1..=(3) {
+        let d = depth-di;
+        let size = 1 << (depth-d);
+        let order_mat = imagematrix::create_matrix(size, size);
+        let reg_mat = imagematrix::create_regression_matrix(&order_mat);
+        match reg_mat {
+            Some(reg) => {
+                println!("Collapsing at size {}", size);
+                println!("reg_mat:\n{}\n", reg);
+                qt.collapse_depth(d, &reg, &order_mat);
+            }
+            None => {
+                panic!("Failed to get reg_mat");
+            }
+        }
+
+        
+        
+
+    }
+
 
 
     // // let test = dmatrix![1 as f64,1 as f64,1 as f64,1 as f64];
@@ -105,19 +179,19 @@ fn main() {
     //     },
     // }
 
-    let mut quad_tree: QuadTree::QuadTree<(usize, usize)> = QuadTree::QuadTree::new_grid(17,9, qt_test_builder);
-    // for (x, y) in quad_tree.iter() {
-    //     println!("Terminal: ({0}, {1})", x, y);
+    // let mut quad_tree: QuadTree::QuadTree<(usize, usize)> = QuadTree::QuadTree::new_grid(17,9, qt_test_builder);
+    // // for (x, y) in quad_tree.iter() {
+    // //     println!("Terminal: ({0}, {1})", x, y);
+    // // }
+    // for quad in quad_tree.iter_depth(3) {
+    //     // let quad;
+    //     // if let QuadTree::Node::Quad(q) = node {
+    //     //     quad = q;
+    //     // } else {
+    //     //     panic!("expected quad");
+    //     // }
+    //     println!("Quad: {0:?}", quad.depth());
+    //     // *node = QuadTree::Node::Empty;
     // }
-    for quad in quad_tree.iter_depth(3) {
-        // let quad;
-        // if let QuadTree::Node::Quad(q) = node {
-        //     quad = q;
-        // } else {
-        //     panic!("expected quad");
-        // }
-        println!("Quad: {0:?}", quad.depth());
-        // *node = QuadTree::Node::Empty;
-    }
 } 
 

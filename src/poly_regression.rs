@@ -1,9 +1,11 @@
 use crate::cut::Cut;
 
+#[derive(Clone)]
 pub struct PolyFunction2D {
     degree: usize,
     coeffs: Vec<f64>
 }
+
 
 impl PolyFunction2D {
     pub fn from(degree: usize, coeffs: Vec<f64>) -> Self {
@@ -37,11 +39,13 @@ impl PolyFunction2D {
 }
 
 
+#[derive(Clone)]
 enum Regression {
     Global(PolyFunction2D),
     Split(Cut, PolyFunction2D, PolyFunction2D),
 }
 
+#[derive(Clone)]
 pub struct ChunkRegression {
     function: Regression,
     pub(crate) cost: f64,
@@ -63,7 +67,7 @@ impl ChunkRegression {
         }
     }
 
-    pub fn new_split(degree: usize, coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, size: usize, MSE: f64) -> Self {
-        // MSE + 4*degree + 2.0 + ((Size*size) as f64).ln()
-    }
+    // pub fn new_split(degree: usize, coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, size: usize, MSE: f64) -> Self {
+    //     // MSE + 4*degree + 2.0 + ((Size*size) as f64).ln()
+    // }
 }

@@ -13,7 +13,14 @@ pub struct Chunk<'a> {
 
 impl<'a> Chunk<'a> {
     pub fn new(image: &'a DynamicImage, coordinate: (u32, u32), size : u32) -> Self {
-        Self { image, regression: ChunkRegression::new_empty(), coordinate, size}
+        Self { 
+            image, 
+            regression_red: ChunkRegression::new_empty(), 
+            regression_green: ChunkRegression::new_empty(), 
+            regression_blue: ChunkRegression::new_empty(), 
+            coordinate, 
+            size
+        }
     }
 
     pub fn pixels(&self) -> Vec<Rgba<u8>> {

@@ -146,7 +146,7 @@ impl<T> QuadTree<T> {
         QuadTree{node: Node::Empty}
     }
 
-    pub fn newGrid(xWidth: usize, yWidth: usize, init: fn(usize, usize) -> T) -> Self {
+    pub fn new_grid(xWidth: usize, yWidth: usize, init: fn(usize, usize) -> T) -> Self {
         if xWidth == 0 || yWidth == 0 {
             return Self::new();
         }
@@ -162,6 +162,7 @@ impl<T> QuadTree<T> {
     pub fn iter_depth<'a>(&'a self, depth: usize) -> QuadTreeDepthIter<'a, T> {
         return QuadTreeDepthIter::new(self, depth);
     }
+
 
 
 }

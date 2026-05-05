@@ -1,7 +1,10 @@
 use image::{DynamicImage, GenericImage, GenericImageView, Pixel, Rgba, SubImage};
 
+use crate::poly_regression::ChunkRegression;
+
 pub struct Chunk<'a> {
     pub image: &'a DynamicImage,
+    // regression: ChunkRegression,
     pub coordinate: (u32, u32),
     pub size: u32
 }

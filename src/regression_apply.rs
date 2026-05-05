@@ -1,6 +1,6 @@
 use nalgebra::{self as na, DMatrix, U2, DVector};
 
-use crate::{image_chunking::{Chunk, pix_to_channels}, poly_regression::{ChunkRegression, PolyFunction2D}};
+use crate::{cut::Cut, image_chunking::{Chunk, pix_to_channels}, poly_regression::{ChunkRegression, PolyFunction2D}};
 
 
 struct ChunkPosIter {
@@ -36,35 +36,47 @@ impl Iterator for ChunkPosIter {
     }
 }
 
-pub fn applyRegression(regres_mat: DMatrix<f64>, pixels: &Vec<f64>) -> DVector<f64> {
+// pub fn applyRegression(regres_mat: DMatrix<f64>, pixels: &Vec<f64>) -> DVector<f64> {
 
-    let mat_shape = regres_mat.shape();
-    println!("{}, {}", mat_shape.0, mat_shape.1);
+//     let mat_shape = regres_mat.shape();
+//     println!("{}, {}", mat_shape.0, mat_shape.1);
 
-    let pix_vec = DVector::from_row_slice(&pixels);
-    let vec_shape = pix_vec.shape();
-    println!("{}, {}", vec_shape.0, vec_shape.1);
-    let coeffs = regres_mat * pix_vec;
+//     let pix_vec = DVector::from_row_slice(&pixels);
+//     let vec_shape = pix_vec.shape();
+//     println!("{}, {}", vec_shape.0, vec_shape.1);
+//     let coeffs = regres_mat * pix_vec;
 
-    let shape = coeffs.shape();
-    println!("{}, {}", shape.0, shape.1);
+//     let shape = coeffs.shape();
+//     println!("{}, {}", shape.0, shape.1);
 
-    return coeffs;
+//     return coeffs;
 
+// }
+
+
+fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, pix_values: &Vec<f64>) -> ChunkRegression {
+    let coeffs = regres_mat*DVector::from_row_slice(pix_values);
+    let predict = order_mat * &coeffs;
+    let predict_vec = predict.as_slice();
+    let mut MSE = 0.0;
+    for (actual, predict) in pix_values.iter().zip(predict_vec) {
+        MSE += (actual - predict).powi(2);
+    }
+    let poly = ChunkRegression::new_global(degree, Vec::from(coeffs.as_slice()), MSE);
+    poly
 }
 
-pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, degree: usize, chunk: Chunk) -> (DVector<f64>, DVector<f64>, DVector<f64>) {
+pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: Chunk, chunk_cut: Option<Cut>) {
 
-    let (r, g, b) = pix_to_channels(chunk.pixels());
-    let red_coeffs = regres_mat*DVector::from_row_slice(&r);
-    let blue_coeffs = regres_mat*DVector::from_row_slice(&g);
-    let green_coeffs = regres_mat*DVector::from_row_slice(&b);
-
-    // The actual arguments need to figured out
-    let red_poly = PolyFunction2D::from(degree, Vec::from(red_coeffs.as_slice()));
-    let blue_poly = PolyFunction2D::from(degree, Vec::from(blue_coeffs.as_slice()));
-    let green_poly = PolyFunction2D::from(degree, Vec::from(green_coeffs.as_slice()));
-
-    return (red_coeffs, blue_coeffs, green_coeffs);
-
+    if let Some(cut) = chunk_cut {
+        unimplemented!()
+    } else {
+        let (r, g, b) = pix_to_channels(chunk.pixels());
+        let red_poly = apply_regression_channel(regres_mat, order_mat, degree, &r);
+        let green_poly = apply_regression_channel(regres_mat, order_mat, degree, &g);
+        let blue_poly = apply_regression_channel(regres_mat, order_mat, degree, &b);
+        
+    }
+    
+    
 }

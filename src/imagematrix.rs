@@ -20,7 +20,7 @@ pub fn create_matrix(width: u32, height: u32) -> DMatrix::<f64> {
     //let x: Vec<f64> = Vec::std::iter::&(0..height).iter().repeat(width).collect();
     //let y: Vec<f64> = Vec::std::iter::&(0..width).iter().collect();
 
-    let a = DMatrix::<f64>::from_column_slice(3 as usize, (width*height) as usize, &v);
+    let a = DMatrix::<f64>::from_column_slice((width*height) as usize, 3 as usize, &v);
     a
 
 }
@@ -68,4 +68,13 @@ pub fn matVecMult(A: DMatrix<f64>, V: DMatrix<f64>)-> DMatrix<f64>{
     println!("{}", results);
     results
 
+}
+
+pub fn create_regression_matrix(X: DMatrix<f64>) -> Option<DMatrix<f64>> {
+
+    let Xt = X.transpose();
+    let temp1 = Xt.clone() * X;
+    let inv = temp1.try_inverse()?;
+    let ret = inv * Xt;
+    Some(ret)
 }

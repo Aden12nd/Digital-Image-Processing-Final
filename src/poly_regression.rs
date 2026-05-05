@@ -1,16 +1,16 @@
 
 
 
-struct PolyRegression2D {
+pub struct PolyFunction2D {
     degree: usize,
     coeffs: Vec<f64>
 }
 
-impl PolyRegression2D {
+impl PolyFunction2D {
     pub fn from(degree: usize, coeffs: Vec<f64>) -> Self {
         // Assert that the number of coefficients is correct for the degree of the polynomial
         assert_eq!(coeffs.len(), (degree + 1) * (degree + 2) / 2);
-        return PolyRegression2D { degree, coeffs };
+        return PolyFunction2D { degree, coeffs };
     }
 
     pub fn eval(&self, x: f64, y: f64) -> f64 {

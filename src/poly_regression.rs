@@ -27,6 +27,11 @@ impl PolyFunction2D {
                 coeff_idx += 1;
             }
         }
+        // c
+        // x y
+        // x2 + y2 + xy
+        // x3 + x2y + xy2 + y3
+        // x4 + x3y + x2y2 +xy3 + y4
         return result;
     }
 

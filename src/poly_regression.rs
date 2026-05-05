@@ -70,8 +70,8 @@ impl ChunkRegression {
                 PolyFunction2D::from(degree, coeffs_a), 
                 PolyFunction2D::from(degree, coeffs_b) 
             ), 
-            // MSE + 4*degree + 2.0 + ((Size*size) as f64).ln()
-            cost: (MSE + (4*degree) as f64 + 2.0 + 2.0*(size as f64).ln()) 
+            // cost = MSE + 4*degree + ln(size^2) + 2
+            cost: MSE + (4*degree) as f64 + 2.0*(size as f64).ln() + 2.0 
         }
     }
 }

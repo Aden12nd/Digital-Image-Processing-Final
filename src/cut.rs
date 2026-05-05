@@ -54,7 +54,7 @@ fn idx(row: usize, col: usize, size: usize) -> usize {
     col * size + row
 }
 
-fn belongs_to_first(row: usize, col: usize, size: usize, cut: &Cut) -> bool {
+pub fn belongs_to_first(row: usize, col: usize, size: usize, cut: &Cut) -> bool {
     let mid = size / 2;
 
     match cut {

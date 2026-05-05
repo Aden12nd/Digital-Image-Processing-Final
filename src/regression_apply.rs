@@ -1,6 +1,12 @@
 use nalgebra::{self as na, DMatrix, U2, DVector};
+use strum::IntoEnumIterator;
 
-use crate::{cut::Cut, image_chunking::{Chunk, pix_to_channels}, poly_regression::{ChunkRegression, PolyFunction2D}};
+use crate::{
+    cut::{Cut, belongs_to_first, cut_segment}, 
+    image_chunking::{Chunk, pix_to_channels}, 
+    poly_regression::{ChunkRegression, PolyFunction2D},
+    imagematrix::{create_regression_matrix, create_matrix}
+};
 
 
 struct ChunkPosIter {
@@ -66,14 +72,34 @@ fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>,
     poly
 }
 
-pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: &mut Chunk, chunk_cut: Option<Cut>) {
-    if let Some(_) = chunk_cut {
-        unimplemented!()
+pub fn apply_regression_to_chunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: &mut Chunk, chunk_cut: Option<Cut>) {
+    if let Some(cut) = chunk_cut {
+        // Split pixels vec into two vecs from each side of the cut
+        let (lhs, _rhs) = cut_segment(chunk.pixels(), chunk.size as usize, cut);
+
+        let (r, g, b) = pix_to_channels(lhs);
+        let red_poly = apply_regression_channel(regres_mat, order_mat, degree, &r);
+        let green_poly = apply_regression_channel(regres_mat, order_mat, degree, &g);
+        let blue_poly = apply_regression_channel(regres_mat, order_mat, degree, &b);
+        chunk.load_regression(red_poly, green_poly, blue_poly);
+
     } else {
         let (r, g, b) = pix_to_channels(chunk.pixels());
         let red_poly = apply_regression_channel(regres_mat, order_mat, degree, &r);
         let green_poly = apply_regression_channel(regres_mat, order_mat, degree, &g);
         let blue_poly = apply_regression_channel(regres_mat, order_mat, degree, &b);
         chunk.load_regression(red_poly, green_poly, blue_poly);
+    }
+}
+
+pub fn apply_cuts_on_chunks(chunk: &mut Chunk) {
+    for cut in Cut::iter() {
+        let degree = 2;
+        let X = create_matrix(2,2);
+        let new_regres_mat = match create_regression_matrix(X.clone()) {
+            Some(regres_mat) => regres_mat,
+            None => return 
+        };
+        apply_regression_to_chunk(&new_regres_mat, &X, degree, chunk, Some(cut));
     }
 }

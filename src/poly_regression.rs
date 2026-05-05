@@ -67,7 +67,15 @@ impl ChunkRegression {
         }
     }
 
-    // pub fn new_split(degree: usize, coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, size: usize, MSE: f64) -> Self {
-    //     // MSE + 4*degree + 2.0 + ((Size*size) as f64).ln()
-    // }
+    pub fn new_split(degree: usize, coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, size: usize, cut: Cut, MSE: f64) -> Self {
+        ChunkRegression { 
+            function: Regression::Split(
+                cut,
+                PolyFunction2D::from(degree, coeffs_a), 
+                PolyFunction2D::from(degree, coeffs_b) 
+            ), 
+            // cost = MSE + 4*degree + ln(size^2) + 2
+            cost: MSE + (4*degree) as f64 + 2.0*(size as f64).ln() + 2.0 
+        }
+    }
 }

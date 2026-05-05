@@ -4,14 +4,16 @@ use crate::poly_regression::ChunkRegression;
 
 pub struct Chunk<'a> {
     pub image: &'a DynamicImage,
-    // regression: ChunkRegression,
+    regression_red: ChunkRegression,
+    regression_green: ChunkRegression,
+    regression_blue: ChunkRegression,
     pub coordinate: (u32, u32),
     pub size: u32
 }
 
 impl<'a> Chunk<'a> {
     pub fn new(image: &'a DynamicImage, coordinate: (u32, u32), size : u32) -> Self {
-        Self { image, coordinate, size}
+        Self { image, regression: ChunkRegression::new_empty(), coordinate, size}
     }
 
     pub fn pixels(&self) -> Vec<Rgba<u8>> {
@@ -35,6 +37,15 @@ impl<'a> Chunk<'a> {
         }
         out
     }
+
+    pub fn load_regression(&mut self, r: ChunkRegression, g: ChunkRegression, b: ChunkRegression) {
+        if self.regression_red.cost + self.regression_green.cost + self.regression_blue.cost < r.cost + g.cost + b.cost {
+            self.regression_red = r;
+            self.regression_green = g;
+            self.regression_blue = b;
+        }
+    }
+    
 }
 
 // Using some pixel data (obtained probably through Chunk.pixels), get a tuple containing 3 vecs. One for each color channel.

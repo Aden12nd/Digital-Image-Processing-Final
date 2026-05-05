@@ -44,10 +44,18 @@ enum Regression {
 
 pub struct ChunkRegression {
     function: Regression,
-    cost: f64,
+    pub(crate) cost: f64,
 }
 
 impl ChunkRegression {
+
+    pub fn new_empty() -> Self {
+        ChunkRegression {
+            function: Regression::Global(PolyFunction2D::from(0, vec![0.0])),
+            cost: f64::INFINITY,
+        }
+    }
+
     pub fn new_global(degree: usize, coeffs: Vec<f64>, MSE: f64) -> Self {
         ChunkRegression { 
             function: Regression::Global(PolyFunction2D::from(degree, coeffs)), 

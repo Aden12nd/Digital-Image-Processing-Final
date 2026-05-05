@@ -66,17 +66,15 @@ fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>,
     poly
 }
 
-pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: Chunk, chunk_cut: Option<Cut>) {
+pub fn applyRegressionToChunk(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>, degree: usize, chunk: &mut Chunk, chunk_cut: Option<Cut>) {
 
-    if let Some(cut) = chunk_cut {
+    if let Some(_) = chunk_cut {
         unimplemented!()
     } else {
         let (r, g, b) = pix_to_channels(chunk.pixels());
         let red_poly = apply_regression_channel(regres_mat, order_mat, degree, &r);
         let green_poly = apply_regression_channel(regres_mat, order_mat, degree, &g);
         let blue_poly = apply_regression_channel(regres_mat, order_mat, degree, &b);
-        
+        chunk.load_regression(red_poly, green_poly, blue_poly);
     }
-    
-    
 }

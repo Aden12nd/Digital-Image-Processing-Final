@@ -41,9 +41,9 @@ fn pix_to_channels(pixel_data: Vec<Rgba<u8>>, ) -> (Vec<f64>, Vec<f64>, Vec<f64>
     let mut out_b: Vec<f64> = Vec::with_capacity(0);
 
     for Rgba {0: [r, g, b, _a]} in pixel_data {
-        out_r.push((r as f64) / 256.0);
-        out_g.push((g as f64) / 256.0);
-        out_b.push((b as f64) / 256.0);
+        out_r.push((r as f64) / 255.0);
+        out_g.push((g as f64) / 255.0);
+        out_b.push((b as f64) / 255.0);
     }
 
     (out_r, out_g, out_b)

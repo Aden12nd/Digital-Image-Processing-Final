@@ -2,7 +2,9 @@
 use nalgebra::{self as na, DMatrix, U2, DVector, dmatrix};
 use std::vec::Vec;
 mod QuadTree;
-use image::{DynamicImage, ImageReader};
+use image::{DynamicImage, ImageBuffer, ImageReader, RgbImage};
+
+use crate::imagematrix::{create_matrix, create_matrix_n, create_regression_matrix};
 
 // use crate::{regression_apply::applyRegression};
 mod image_chunking;
@@ -16,8 +18,8 @@ fn qt_builder<'b, 'a: 'b>(img: &'a DynamicImage) -> Box<dyn Fn((usize, usize)) -
     Box::new(|pos| image_chunking::Chunk::<'a>::new(img, (pos.0 as u32, pos.1 as u32), 1))
 }
 
-fn qt_test_builder(x: usize, y: usize) -> (usize, usize) {
-    (x,y)
+fn qt_test_builder(pos: (usize, usize)) -> (usize, usize) {
+    pos
 } 
 
 // fn([&Node<T>;4]) -> Option<Node<T>>
@@ -60,9 +62,37 @@ fn qt_test_builder(x: usize, y: usize) -> (usize, usize) {
 //     Box::new(move |nodes: [&'a QuadTree::Node<image_chunking::Chunk<'a>>; 4]| collapse(nodes, reg_mat))
 // }
 
+
+fn quad_to_img(qt: QuadTree::QuadTree<image_chunking::Chunk>, width: u32, height: u32) -> DynamicImage {
+    let mut img: RgbImage = ImageBuffer::new(width, height);
+
+    for chunk in qt.iter() {
+        for x in 0..chunk.size {
+            for y in 0..chunk.size {
+                let rgb: [u8;3] = [
+                    chunk.regression_red.predict(x as f64, y as f64) as u8,
+                    chunk.regression_green.predict(x as f64, y as f64) as u8,
+                    chunk.regression_blue.predict(x as f64, y as f64) as u8,
+                ];
+                // println!("rgb {} {} {}", rgb[0], rgb[1], rgb[2]);
+                // println!("rgb {:?}", chunk.regression_red.);
+                img.put_pixel(
+                    x + chunk.coordinate.0,
+                    y + chunk.coordinate.1,
+                    image::Rgb(rgb)
+                );
+            }
+        }
+    }
+
+    image::DynamicImage::ImageRgb8(img)
+
+}
+
+
 fn main() {
 
-    let img: DynamicImage = match ImageReader::open("images/image.png").unwrap().decode() {
+    let img: DynamicImage = match ImageReader::open("images/SpaceImage_01.PNG").unwrap().decode() {
         Ok(decoded) => decoded,
         Err(_) => panic!("Encountered error in decoding image"),
     };
@@ -71,6 +101,7 @@ fn main() {
     let height = img.height();
 
     let builder = qt_builder(&img);
+    println!("{} {}", width, height);
 
     let mut qt = QuadTree::QuadTree::new_grid(width as usize, height as usize, &builder);
     let depth = qt.depth();
@@ -78,26 +109,73 @@ fn main() {
     println!("Min depth is {}", qt.min_depth());
 
     // let collapser = make_collapser(reg_mat);
+
+    // print.
     println!("Starting collapsing {}", depth);
-    for di in 1..=(3) {
+
+
+    let mut collapsed: usize = 1;
+    if depth >= 1 {
+        let d = depth-1;
+        let size = 1 << (depth-d);
+
+        println!("Collapsing at size {}", size);
+        println!("Max polynomial degree size is {}", 1);
+        let mats = imagematrix::MatPack::new(size, 1);
+        collapsed = qt.collapse_depth(d, &mats);
+        println!("Collapsed {} quads\n\n", collapsed);
+
+    }
+
+    if depth >= 2 && collapsed != 0 {
+        let d = depth-2;
+        let size = 1 << (depth-d);
+
+        println!("Collapsing at size {}", size);
+        println!("Max polynomial degree size is {}", 3);
+        let mats = imagematrix::MatPack::new(size, 3);
+        collapsed = qt.collapse_depth(d, &mats);
+        println!("Collapsed {} quads\n\n", collapsed);
+
+    }
+
+    for di in 3..=(depth-1) {
+        if collapsed == 0 {
+            break;
+        }
         let d = depth-di;
         let size = 1 << (depth-d);
-        let order_mat = imagematrix::create_matrix(size, size);
-        let reg_mat = imagematrix::create_regression_matrix(&order_mat);
-        match reg_mat {
-            Some(reg) => {
-                println!("Collapsing at size {}", size);
-                println!("reg_mat:\n{}\n", reg);
-                qt.collapse_depth(d, &reg, &order_mat);
-            }
-            None => {
-                panic!("Failed to get reg_mat");
-            }
-        }
 
-        
-        
+        println!("Collapsing at size {}", size);
+        println!("Max polynomial degree size is {}", 5);
+        let mats = imagematrix::MatPack::new(size, 5);
+        collapsed = qt.collapse_depth(d, &mats);
+        println!("Collapsed {} quads\n\n", collapsed);
+        // let order_mat = imagematrix::create_matrix(size, size);
+        // let reg_mat = imagematrix::create_regression_matrix(&order_mat);
+        // match reg_mat {
+        //     Some(reg) => {
+        //         println!("Collapsing at size {}\n\n", size);
+        //         // println!("reg_mat:\n{}\n", reg);
+        //         let collapsed = qt.collapse_depth(d, &reg, &order_mat);
+        //         println!("Collapsed {} quads", collapsed);
+        //         if collapsed == 0 {
+        //             break;
+        //         }
+        //     }
+        //     None => {
+        //         panic!("Failed to get reg_mat");
+        //     }
+        // }
+    }
+    println!("New Min depth is {}", qt.min_depth());
+    println!("New depth is {}", qt.depth());
 
+    println!("Creating result image");
+    let res_img = quad_to_img(qt, width, height);
+    match res_img.save("images/space_out.png") {
+        Ok(_) => println!("Saved image"),
+        Err(_) => println!("Failed to save image"),
     }
 
 
@@ -179,10 +257,12 @@ fn main() {
     //     },
     // }
 
-    // let mut quad_tree: QuadTree::QuadTree<(usize, usize)> = QuadTree::QuadTree::new_grid(17,9, qt_test_builder);
-    // // for (x, y) in quad_tree.iter() {
-    // //     println!("Terminal: ({0}, {1})", x, y);
-    // // }
+    // let mut quad_tree: QuadTree::QuadTree<(usize, usize)> = QuadTree::QuadTree::new_grid(17,9, &qt_test_builder);
+    // println!("depth: {}", quad_tree.depth());
+    // println!("min depth {}", quad_tree.min_depth());
+    // for (x, y) in quad_tree.iter() {
+    //     println!("Terminal: ({0}, {1})", x, y);
+    // }
     // for quad in quad_tree.iter_depth(3) {
     //     // let quad;
     //     // if let QuadTree::Node::Quad(q) = node {

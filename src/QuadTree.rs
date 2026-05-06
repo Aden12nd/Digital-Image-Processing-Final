@@ -2,7 +2,7 @@ use std::cmp::max;
 
 use nalgebra::DMatrix;
 
-use crate::{image_chunking, regression_apply};
+use crate::{image_chunking, imagematrix, regression_apply};
 
 use nalgebra::{self as na, U2, DVector, dmatrix};
 
@@ -89,11 +89,12 @@ impl Quad {
             match &regestry.nodes[id] {
                 Node::Terminal(_) | Node::Empty => continue,
                 Node::Quad(quad) => {
-                    println!("Looking for terminal, found quad {}", quad.depth(regestry));
+                    // println!("Looking for terminal, found quad {}", quad.depth(regestry));
                     return false;
                 },
                 Node::Empty => {
-                    println!("Looking for terminal, found Empty");
+                    // println!("Looking for terminal, found Empty");
+                    return false;
 
                 }
             }
@@ -129,6 +130,9 @@ impl Quad {
                 },
                 _ => continue,
             }
+        }
+        if min_child_depth == 1000000000000 {
+            min_child_depth = 0;
         }
         return min_child_depth + 1;
     }
@@ -215,11 +219,12 @@ impl<T: Clone> Node<T> {
 
 
 
-// // Iterator struct for all terminal nodes in the quad tree
-// pub struct QuadTreeTerminalIter<'a, T> {
-//     qt_stack: Vec::<(&'a Quad, usize)>,
-//     cur: Option<&'a Node<T>>,
-// }
+// Iterator struct for all terminal nodes in the quad tree
+pub struct QuadTreeTerminalIter<'a, T: Clone> {
+    qt_stack: Vec::<(&'a Quad, usize)>,
+    cur: Option<&'a Node<T>>,
+    regestry: &'a NodeRegestry<T>
+}
 
 // pub struct QuadTreeDepthIter<'a, T> {
 //     qt_stack: Vec::<(&'a Quad<T>, usize)>,
@@ -248,9 +253,9 @@ impl<T: Clone> QuadTree<T> {
         return QuadTree{ node: node, regestry: regestry};
     }
 
-    // pub fn iter<'a>(&'a self) -> QuadTreeTerminalIter<'a, T> {
-    //     return QuadTreeTerminalIter::new(self);
-    // }
+    pub fn iter<'a>(&'a self) -> QuadTreeTerminalIter<'a, T> {
+        return QuadTreeTerminalIter::new(self);
+    }
 
     // pub fn iter_depth<'a>(&'a self, depth: usize) -> QuadTreeDepthIter<'a, T> {
     //     return QuadTreeDepthIter::new(self, depth);
@@ -317,16 +322,16 @@ impl<T: Clone> QuadTree<T> {
 
 
 impl<'c> QuadTree<image_chunking::Chunk<'c>> {
-    fn descend(&mut self, cur: usize, stack: &mut Vec<(usize, usize)>, depth: usize) -> Option<usize> {
+    fn descend(&mut self, cur: usize, stack: &mut Vec<(usize, usize)>, depth: usize) -> Result<usize, usize> {
         if stack.len() == depth {
-            return Some(cur);
+            return Ok(cur);
         }
         if let Node::Quad(quad) = self.regestry.get(cur) {
             let next = quad.nodes[0];
             stack.push((cur, 1));
             self.descend(next, stack, depth)
         } else {
-            None
+            Err(cur)
         }
     }
 
@@ -336,6 +341,7 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
                 self.ascend(stack)
             } else {
                 if let Node::Quad(quad) = self.regestry.get(pop_node) {
+                    stack.push((pop_node, pop_idx+1));
                     Some(quad.nodes[pop_idx])
                 } else {
                     panic!("Unexpected Non-quad in internal stack during ascent while collapsing")
@@ -348,20 +354,21 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
 
     }
 
-    fn collapse<'b, 'a>(children: [&Node<image_chunking::Chunk<'a>>; 4], reg_mat: &DMatrix<f64>, order_mat:&DMatrix<f64>) -> Option<Node<image_chunking::Chunk<'a>>> {
-        println!("Collapsing children");
+    fn collapse<'b, 'a>(children: [&Node<image_chunking::Chunk<'a>>; 4], matricies: &imagematrix::MatPack) -> Option<Node<image_chunking::Chunk<'a>>> {
+        // println!("Collapsing children");
         let mut chunks: [&image_chunking::Chunk; 4] = unsafe { std::mem::MaybeUninit::uninit().assume_init() };
         let mut children_cost_r = 0.0;
         let mut children_cost_g = 0.0;
         let mut children_cost_b = 0.0;
         for (i, child) in children.iter().enumerate() {
             if let Node::<image_chunking::Chunk>::Terminal(child_chunk) = *child {
+                // println!("Child size: {}", child_chunk.size);
                 children_cost_r += child_chunk.regression_red.cost;
                 children_cost_g += child_chunk.regression_green.cost;
                 children_cost_b += child_chunk.regression_blue.cost;
                 chunks[i] = child_chunk;
             } else {
-                println!("Non-Terminal found, not reducing");
+                // println!("Non-Terminal found, not reducing");
                 return None;
             }
         }
@@ -369,40 +376,47 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
         // let mut new_chunk = image_chunking::Chunk::new_combine(&chunks);
         let mut new_chunk = image_chunking::Chunk::new(chunks[0].image, chunks[0].coordinate, chunks[0].size *2);
 
-        regression_apply::applyRegressionToChunk(reg_mat, order_mat, 1, &mut new_chunk, None);
 
-        println!("children cost: {} {} {}", children_cost_r, children_cost_g, children_cost_b);
-        println!("parent cost: {} {} {}", new_chunk.regression_red.cost, new_chunk.regression_red.cost, new_chunk.regression_red.cost);
+
+        for d in 0..=matricies.max_deg {
+            let (reg, ord) = matricies.get(d);
+            regression_apply::apply_regression_to_chunk(reg, ord, d as usize, &mut new_chunk, None);
+        }
+
+        // println!("children cost: {} {} {}", children_cost_r, children_cost_g, children_cost_b);
+        // println!("parent cost: {} {} {}", new_chunk.regression_red.cost, new_chunk.regression_red.cost, new_chunk.regression_red.cost);
 
         if new_chunk.regression_red.cost + new_chunk.regression_red.cost + new_chunk.regression_red.cost
             < children_cost_r + children_cost_g + children_cost_b {
+
             
-            println!("Collapsing children\n");
+            // println!("Collapsing children\n");
             return Some(Node::Terminal(new_chunk));
         } else {
-            println!("Not collapsing children\n");
+            // println!("Not collapsing children\n");
             None
         }
         
     }
 
     // init: &dyn Fn((usize, usize)) -> T
-    pub fn collapse_depth<'a: 'c>(& mut self, depth: usize, reg_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>) {
+    pub fn collapse_depth<'a: 'c>(& mut self, depth: usize, matricies: &imagematrix::MatPack) -> usize {
         let mut stack: Vec<(usize, usize)> = Vec::new();
         let mut cur = self.node;
+        let mut num_collapsed = 0;
         loop  {
             let res = self.descend(cur, &mut stack, depth);
             
             // Check if descent found a node, is a quad, and is terminal
             // If so call collapser, if Some(Node) recieved, overright node
-            if let Some(next_node) = res {
-                println!("Descent found a node {} {}", next_node, stack.len());
+            if let Ok(next_node) = res {
+                // println!("Descent found a node {} {}", next_node, stack.len());
                 let node = self.regestry.get(next_node);
                 if let Node::Quad(quad) = node {
                     let is_term = quad.is_terminal(&self.regestry);
 
                     if is_term {
-                        println!("It's terminal");
+                        // println!("It's terminal");
 
                         let node1 = self.regestry.get(quad.nodes[0]);
                         let node2 =self.regestry.get(quad.nodes[1]);
@@ -414,20 +428,15 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
                             node3,
                             node4
                         ],
-                            reg_mat,
-                            order_mat,
+                            matricies,
                         );
                         if let Some(collapse_node) = collapse_res {
+                            num_collapsed += 1;
                             self.regestry.set_node(next_node, collapse_node.clone());
                         }
                     }
                 } else {
-                    match node {
-                        Node::Quad(quad) => println!("Quad"),
-                        Node::Terminal(_) => println!("terminal"),
-                        Node::Empty => println!("Empty"),
-                    }
-                    println!("Found non quad");
+                    // println!("Found non quad");
                 }
             }
 
@@ -439,10 +448,9 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
 
 
         }
-
+        num_collapsed
 
     }
-
 }
 
 // // Function called on quads guaranteed to be consisting of terminals
@@ -453,73 +461,73 @@ impl<'c> QuadTree<image_chunking::Chunk<'c>> {
 //     return Node::Quad(node);
 // }
 
-// impl<'a, T> QuadTreeTerminalIter<'a, T> {
-//     fn new(qt: &'a QuadTree<T>) -> Self {
-//         QuadTreeTerminalIter {
-//             qt_stack: Vec::new(),
-//             cur: Some(&qt.node),
-//         }
+impl<'a, T: Clone> QuadTreeTerminalIter<'a, T> {
+    fn new(qt: &'a QuadTree<T>) -> Self {
+        QuadTreeTerminalIter {
+            qt_stack: Vec::new(),
+            cur: Some(&qt.regestry.get(qt.node)),
+            regestry: &qt.regestry,
+        }
+    }
+}
 
-//     }
-// }
-
-// impl<T: Copy> Iterator for QuadTreeTerminalIter<'_, T> {
-//     // We can refer to this type using Self::Item
-//     type Item = T;
+impl<'a, T: Clone> Iterator for QuadTreeTerminalIter<'a, T> {
+    // We can refer to this type using Self::Item
+    type Item = &'a T;
 
 
-//     fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Self::Item> {
 
-//         match self.cur {
-//             None => {
-//                 return None;
-//             }
-//             Some(Node::Quad(quad)) => { 
-//                 // If its a quad assume we haven't explored it yet, descent untill terminal
-//                 let new_cur = &quad.nodes[0];
-//                 self.qt_stack.push((quad, 1)); // push quad with next idx to explore
-//                 self.cur = Some(new_cur);
-//                 self.next()
-//             }
-//             Some(Node::Terminal(ret)) => {
-//                 let mut poped_idx;
-//                 let mut poped_node: &Quad<T>;
-//                 // idx of 4 mean there is no child left to iterate through on this node, keep going up the stack
-//                 loop { // Do while poped_idx == 4
-//                     (poped_node, poped_idx) = match self.qt_stack.pop() {
-//                         Some(poped) => poped,
-//                         None => {
-//                             self.cur = None; // if reached end of stack, then iteration finished after current
-//                             return Some(*ret); 
-//                         },
-//                     };
-//                     if poped_idx != 4 {break;}
-//                 }
-//                 self.cur = Some(&poped_node.nodes[poped_idx]);
-//                 self.qt_stack.push((poped_node, poped_idx+1));
-//                 Some(*ret)
-//             }
-//             Some(Node::Empty) => {
-//                 let mut poped_idx = 3;
-//                 let mut poped_node: &Quad<T>;
-//                 // idx of 4 mean there is no child left to iterate through on this node, keep going up the stack
-//                 loop { // Do while poped_idx == 4
-//                     (poped_node, poped_idx) = match self.qt_stack.pop() {
-//                         Some(poped) => poped,
-//                         None => {
-//                             self.cur = None; // if reached end of stack, then iteration finished after current
-//                             return self.next(); // Skip empty by recalling next
-//                         },
-//                     };
-//                     if poped_idx != 4 {break;}
-//                 }
-//                 self.cur = Some(&poped_node.nodes[poped_idx]);
-//                 self.qt_stack.push((poped_node, poped_idx+1));
-//                 self.next() // Skep empty by recalling next
-//             }
-//         }
-//     }
-// }
+        match self.cur {
+            None => {
+                return None;
+            }
+            Some(Node::Quad(quad)) => { 
+                // If its a quad assume we haven't explored it yet, descent untill terminal
+                let new_cur = quad.nodes[0];
+                self.qt_stack.push((quad, 1)); // push quad with next idx to explore
+                self.cur = Some(self.regestry.get(new_cur));
+                self.next()
+            }
+            Some(Node::Terminal(ret)) => {
+                let mut poped_idx;
+                let mut poped_node: &Quad;
+                // idx of 4 mean there is no child left to iterate through on this node, keep going up the stack
+                loop { // Do while poped_idx == 4
+                    (poped_node, poped_idx) = match self.qt_stack.pop() {
+                        Some(poped) => poped,
+                        None => {
+                            self.cur = None; // if reached end of stack, then iteration finished after current
+                            return Some(ret); 
+                        },
+                    };
+                    if poped_idx != 4 {break;}
+                }
+                self.cur = Some(&self.regestry.get(poped_node.nodes[poped_idx]));
+                self.qt_stack.push((poped_node, poped_idx+1));
+                Some(ret)
+            }
+            Some(Node::Empty) => {
+                let mut poped_idx = 3;
+                let mut poped_node: &Quad;
+                // idx of 4 mean there is no child left to iterate through on this node, keep going up the stack
+                loop { // Do while poped_idx == 4
+                    (poped_node, poped_idx) = match self.qt_stack.pop() {
+                        Some(poped) => poped,
+                        None => {
+                            self.cur = None; // if reached end of stack, then iteration finished after current
+                            return self.next(); // Skip empty by recalling next
+                        },
+                    };
+                    if poped_idx != 4 {break;}
+                }
+                self.cur = Some(&self.regestry.get(poped_node.nodes[poped_idx]));
+                self.qt_stack.push((poped_node, poped_idx+1));
+                self.next() // Skep empty by recalling next
+            }
+        }
+    }
+}
 
 // impl<'a, T> QuadTreeDepthIter<'a, T> {
 //     fn new(qt: &'a QuadTree<T>, depth: usize) -> Self {

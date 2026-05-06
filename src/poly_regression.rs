@@ -33,6 +33,7 @@ impl PolyFunction2D {
         // x2 + y2 + xy
         // x3 + x2y + xy2 + y3
         // x4 + x3y + x2y2 +xy3 + y4
+        // println!("Result: {}", result);
         return result;
     }
 
@@ -63,7 +64,7 @@ impl ChunkRegression {
     pub fn new_global(degree: usize, coeffs: Vec<f64>, MSE: f64) -> Self {
         ChunkRegression { 
             function: Regression::Global(PolyFunction2D::from(degree, coeffs)), 
-            cost: MSE + (2*degree) as f64 + 1.0
+            cost: MSE + (degree) as f64 + 1.0
         }
     }
 
@@ -78,4 +79,11 @@ impl ChunkRegression {
             cost: MSE + (4*degree) as f64 + 2.0*(size as f64).ln() + 2.0 
         }
     }
+
+    pub fn predict(&self, x: f64, y: f64) -> f64 {
+        match &self.function {
+            Regression::Global(fun) => fun.eval(x, y),
+            Regression::Split(_, _, _) => panic!("Does not handle splits"),
+        }
+    } 
 }

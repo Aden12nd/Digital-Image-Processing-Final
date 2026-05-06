@@ -68,6 +68,10 @@ fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>,
     for (actual, predict) in pix_values.iter().zip(predict_vec) {
         MSE += (actual - predict).powi(2);
     }
+    MSE /= pix_values.len() as f64;
+    // println!("{:?}", pix_values);
+    // println!("{:?}", predict_vec);
+    // println!("MSE: {}", MSE);
     let poly = ChunkRegression::new_global(degree, Vec::from(coeffs.as_slice()), MSE);
     poly
 }
@@ -96,7 +100,7 @@ pub fn apply_cuts_on_chunks(chunk: &mut Chunk) {
     for cut in Cut::iter() {
         let degree = 2;
         let X = create_matrix(2,2);
-        let new_regres_mat = match create_regression_matrix(X.clone()) {
+        let new_regres_mat = match create_regression_matrix(&X) {
             Some(regres_mat) => regres_mat,
             None => return 
         };

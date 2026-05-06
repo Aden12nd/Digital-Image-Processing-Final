@@ -36,7 +36,6 @@ pub fn create_matrix_n(width: u32, height: u32, n: u32) -> DMatrix::<f64> {
     let mut v: Vec<f64> = Vec::with_capacity((height*width*((2*n+1) as u32)) as usize);
     for j in 0..(height*width){
         v.push(1.0);
-        println!("1");
     }
 
     for deg in 1..=n {
@@ -73,7 +72,7 @@ pub fn create_matrix_n(width: u32, height: u32, n: u32) -> DMatrix::<f64> {
     //let y: Vec<f64> = Vec::std::iter::&(0..width).iter().collect();
 
     let a = DMatrix::<f64>::from_column_slice((width*height) as usize, ((n + 1) * (n + 2) / 2) as usize, &v);
-    println!("{}", a);
+    // println!("{}", a);
     a
 
 }
@@ -100,7 +99,43 @@ pub fn create_regression_matrix(X: &DMatrix<f64>) -> Option<DMatrix<f64>> {
 
     let Xt = X.transpose();
     let temp1 = &Xt * X;
-    let inv = temp1.try_inverse()?;
+    let inv = temp1.pseudo_inverse(0.00001).ok()?;
     let ret = inv * Xt;
     Some(ret)
+}
+
+
+
+pub struct MatPack {
+    order_mats: Vec<DMatrix<f64>>,
+    reg_mats: Vec<DMatrix<f64>>,
+    pub max_deg: u32,
+}
+
+impl MatPack {
+    pub fn new(size: usize, max_degree: u32) -> Self {
+        let mut orders: Vec<DMatrix<f64>> = Vec::new();
+        let mut regs: Vec<DMatrix<f64>> = Vec::new();
+        for d in 0..=max_degree {
+            let ord = create_matrix_n(size as u32, size as u32, d);
+            if let Some(reg) = create_regression_matrix(&ord) {
+                regs.push(reg);
+            } else {
+                panic!("Failed to create regression matrix");
+            }
+            orders.push(ord);
+        }
+        MatPack {
+            order_mats: orders,
+            reg_mats: regs,
+            max_deg: max_degree,
+        }
+    }
+
+    pub fn get(&self, deg: u32) -> (&DMatrix<f64>, &DMatrix<f64>) {
+        if deg > self.max_deg {
+            panic!("Requested degree out of bounds");
+        }
+        (&self.reg_mats[deg as usize], &self.order_mats[deg as usize])
+    }
 }

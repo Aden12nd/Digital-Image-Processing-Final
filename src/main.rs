@@ -92,7 +92,7 @@ fn quad_to_img(qt: QuadTree::QuadTree<image_chunking::Chunk>, width: u32, height
 
 fn main() {
 
-    let img: DynamicImage = match ImageReader::open("images/SpaceImage_01.PNG").unwrap().decode() {
+    let img: DynamicImage = match ImageReader::open("images/pexels-noise.png").unwrap().decode() {
         Ok(decoded) => decoded,
         Err(_) => panic!("Encountered error in decoding image"),
     };
@@ -147,8 +147,8 @@ fn main() {
         let size = 1 << (depth-d);
 
         println!("Collapsing at size {}", size);
-        println!("Max polynomial degree size is {}", 5);
-        let mats = imagematrix::MatPack::new(size, 5);
+        println!("Max polynomial degree size is {}", 7);
+        let mats = imagematrix::MatPack::new(size, 7);
         collapsed = qt.collapse_depth(d, &mats);
         println!("Collapsed {} quads\n\n", collapsed);
         // let order_mat = imagematrix::create_matrix(size, size);
@@ -173,7 +173,7 @@ fn main() {
 
     println!("Creating result image");
     let res_img = quad_to_img(qt, width, height);
-    match res_img.save("images/space_out.png") {
+    match res_img.save("images/pexels-noise-out3.png") {
         Ok(_) => println!("Saved image"),
         Err(_) => println!("Failed to save image"),
     }

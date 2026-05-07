@@ -66,6 +66,7 @@ fn apply_regression_channel(regres_mat: &DMatrix<f64>, order_mat: &DMatrix<f64>,
     let predict_vec = predict.as_slice();
     let mut MSE = 0.0;
     for (actual, predict) in pix_values.iter().zip(predict_vec) {
+        // MSE += (actual - predict).abs();
         MSE += (actual - predict).powi(2);
     }
     MSE /= pix_values.len() as f64;
